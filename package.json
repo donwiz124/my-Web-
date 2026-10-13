@@ -1,0 +1,25 @@
+{
+  "name": "donwiz-hub",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"npm:dev:web\" \"npm:dev:api\"",
+    "dev:web": "npm --prefix apps/web run dev",
+    "dev:api": "npm --prefix apps/api run dev",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:seed": "npm --prefix apps/api run seed",
+    "build:api": "npm --prefix apps/api run build",
+    "check": "npm --prefix apps/api run typecheck && npm --prefix apps/web run typecheck",
+    "db:push": "prisma db push",
+    "db:deploy": "prisma migrate deploy",
+    "build": "npm run build:api && npm --prefix apps/web run build"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "prisma": "^6.16.2"
+  },
+  "workspaces": [
+    "apps/api",
+    "apps/web"
+  ]
+}

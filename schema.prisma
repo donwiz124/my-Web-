@@ -1,0 +1,50 @@
+generator client { provider = "prisma-client-js" }
+datasource db { provider = "postgresql" url = env("DATABASE_URL") }
+
+enum Role { STUDENT CREATOR ADMIN SUPER_ADMIN }
+enum TxStatus { PENDING SUCCESSFUL FAILED REFUNDED }
+enum WithdrawalStatus { PENDING APPROVED PAID REJECTED }
+enum ProductType { COURSE CREDITS MARKETPLACE SUBSCRIPTION }
+enum MembershipPlan { FREE PRO BUSINESS }
+enum CommunityCategory { AI DESIGN VIDEO MARKETING BUSINESS FREELANCING GENERAL }
+enum JobType { FREELANCE FULL_TIME PART_TIME INTERNSHIP CONTRACT }
+
+model User {
+ id String @id @default(cuid()); email String @unique; passwordHash String; name String; role Role @default(STUDENT)
+ emailVerified Boolean @default(false); creditBalance Int @default(0); membership MembershipPlan @default(FREE); profilePhotoUrl String?
+ createdAt DateTime @default(now()); updatedAt DateTime @updatedAt
+ purchases CoursePurchase[]; credits CreditTransaction[]; referrals Referral[] @relation("referrer"); referredBy Referral? @relation("referredUser")
+ withdrawals Withdrawal[]; aiUsages AiUsage[]; savedPrompts SavedPrompt[]; productPurchases ProductPurchase[]; subscriptions Subscription[]
+ posts CommunityPost[]; comments CommunityComment[]; likes CommunityLike[]; applications JobApplication[]; certificates Certificate[]; notifications Notification[]
+ transactions Transaction[]; reviews Review[]; progress CourseProgress[]; authTokens AuthToken[]; wishlist WishlistItem[]
+}
+model Course { id String @id @default(cuid()); title String; slug String @unique; description String; price Int @default(1500); published Boolean @default(false); category String @default("AI")
+ level String @default("BEGINNER"); cover String @default("ai"); instructor String @default("Donwiz Handsome"); outcomes String[] @default([]); requirements String[] @default([]); wishlist WishlistItem[]; durationMinutes Int @default(60); certificateEligible Boolean @default(true); lessons Lesson[]; purchases CoursePurchase[]; progress CourseProgress[]; reviews Review[]; createdAt DateTime @default(now()); updatedAt DateTime @updatedAt }
+model Lesson { id String @id @default(cuid()); courseId String; title String; videoKey String; isPreview Boolean @default(false); order Int; course Course @relation(fields:[courseId], references:[id], onDelete:Cascade); progress CourseProgress[] }
+model CoursePurchase { id String @id @default(cuid()); userId String; courseId String; transactionId String @unique; amount Int; status TxStatus @default(PENDING); user User @relation(fields:[userId], references:[id]); course Course @relation(fields:[courseId], references:[id]); createdAt DateTime @default(now()); @@unique([userId,courseId]) }
+model Transaction { id String @id @default(cuid()); userId String; provider String; providerRef String @unique; type ProductType; amount Int; usdAmount Int @default(0); currency String; status TxStatus; metadata Json?; user User @relation(fields:[userId], references:[id]); createdAt DateTime @default(now()) }
+model CreditTransaction { id String @id @default(cuid()); userId String; amount Int; reason String; balanceAfter Int; user User @relation(fields:[userId], references:[id]); createdAt DateTime @default(now()) }
+model AiTool { id String @id @default(cuid()); name String; slug String @unique; description String; category String; creditCost Int @default(0); premium Boolean @default(false); active Boolean @default(true); createdAt DateTime @default(now()); usages AiUsage[] }
+model AiUsage { id String @id @default(cuid()); userId String; toolId String; credits Int; input Json?; output String?; user User @relation(fields:[userId], references:[id]); tool AiTool @relation(fields:[toolId], references:[id]); createdAt DateTime @default(now()) }
+model SavedPrompt { id String @id @default(cuid()); userId String; title String; prompt String; user User @relation(fields:[userId], references:[id]); createdAt DateTime @default(now()) }
+model Product { id String @id @default(cuid()); title String; slug String @unique; description String; type String; price Int; fileKey String?; published Boolean @default(false); creatorId String?; purchases ProductPurchase[]; createdAt DateTime @default(now()) }
+model ProductPurchase { id String @id @default(cuid()); userId String; productId String; transactionId String; amount Int; status TxStatus @default(PENDING); user User @relation(fields:[userId], references:[id]); product Product @relation(fields:[productId], references:[id]); createdAt DateTime @default(now()); @@unique([userId,productId]) }
+model Subscription { id String @id @default(cuid()); userId String; plan MembershipPlan; provider String?; providerRef String? @unique; amount Int; currency String; status String; startsAt DateTime; endsAt DateTime; user User @relation(fields:[userId], references:[id]); createdAt DateTime @default(now()) }
+model Referral { id String @id @default(cuid()); referrerId String; referredUserId String @unique; commissionRate Int @default(20); referrer User @relation("referrer", fields:[referrerId], references:[id]); referredUser User @relation("referredUser", fields:[referredUserId], references:[id]); commissions ReferralCommission[]; createdAt DateTime @default(now()) }
+model ReferralCommission { id String @id @default(cuid()); referralId String; transactionId String @unique; amount Int; rate Int; status String @default("PENDING"); referral Referral @relation(fields:[referralId], references:[id]); createdAt DateTime @default(now()) }
+model Withdrawal { id String @id @default(cuid()); userId String; amount Int; payoutDetails String?; status WithdrawalStatus @default(PENDING); user User @relation(fields:[userId], references:[id]); createdAt DateTime @default(now()); updatedAt DateTime @updatedAt }
+model Certificate { id String @id @default(cuid()); userId String; courseId String; certificateId String @unique; completionDate DateTime @default(now()); verificationToken String @unique; user User @relation(fields:[userId], references:[id]); course Course @relation(fields:[courseId], references:[id]); @@unique([userId,courseId]) }
+model CommunityPost { id String @id @default(cuid()); userId String; title String; body String; category CommunityCategory; published Boolean @default(true); user User @relation(fields:[userId], references:[id]); comments CommunityComment[]; likes CommunityLike[]; createdAt DateTime @default(now()) }
+model CommunityComment { id String @id @default(cuid()); postId String; userId String; body String; post CommunityPost @relation(fields:[postId], references:[id], onDelete:Cascade); user User @relation(fields:[userId], references:[id]); createdAt DateTime @default(now()) }
+model CommunityLike { id String @id @default(cuid()); postId String; userId String; post CommunityPost @relation(fields:[postId], references:[id], onDelete:Cascade); user User @relation(fields:[userId], references:[id]); @@unique([postId,userId]) }
+model Job { id String @id @default(cuid()); title String; company String; description String; location String; remote Boolean @default(true); payment String?; requirements String?; deadline DateTime?; type JobType @default(FREELANCE); published Boolean @default(false); applications JobApplication[]; createdAt DateTime @default(now()) }
+model JobApplication { id String @id @default(cuid()); jobId String; userId String; message String; status String @default("PENDING"); job Job @relation(fields:[jobId], references:[id], onDelete:Cascade); user User @relation(fields:[userId], references:[id]); createdAt DateTime @default(now()); @@unique([jobId,userId]) }
+model Notification { id String @id @default(cuid()); userId String; title String; body String; read Boolean @default(false); user User @relation(fields:[userId], references:[id]); createdAt DateTime @default(now()) }
+model Review { id String @id @default(cuid()); userId String; courseId String; rating Int; comment String; user User @relation(fields:[userId], references:[id]); course Course @relation(fields:[courseId], references:[id]); createdAt DateTime @default(now()); @@unique([userId,courseId]) }
+model Setting { key String @id; value String; updatedAt DateTime @updatedAt }
+model AdminLog { id String @id @default(cuid()); adminId String; action String; targetType String; targetId String?; metadata Json?; createdAt DateTime @default(now()) }
+
+model CourseProgress { id String @id @default(cuid()); userId String; lessonId String; completed Boolean @default(false); watchedSeconds Int @default(0); user User @relation(fields:[userId], references:[id], onDelete:Cascade); lesson Lesson @relation(fields:[lessonId], references:[id], onDelete:Cascade); updatedAt DateTime @updatedAt; @@unique([userId,lessonId]) }
+
+model AuthToken { id String @id @default(cuid()); userId String; type String; tokenHash String @unique; expiresAt DateTime; usedAt DateTime?; user User @relation(fields:[userId], references:[id], onDelete:Cascade); createdAt DateTime @default(now()) }
+model WishlistItem { id String @id @default(cuid()); userId String; courseId String; user User @relation(fields:[userId], references:[id], onDelete:Cascade); course Course @relation(fields:[courseId], references:[id], onDelete:Cascade); createdAt DateTime @default(now()); @@unique([userId,courseId]) }
